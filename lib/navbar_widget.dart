@@ -20,21 +20,21 @@ class _NavbarWidgetState extends State<NavbarWidget> {
       items: const [
         BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
         BottomNavigationBarItem(
-          icon: Icon(Icons.inventory),
-          label: "Inventory",
+          icon: Icon(Icons.book),
+          label: "Buku",
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Transaction"),
+        BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: "Peminjaman"),
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Setting"),
       ],
       onTap: (index) {
         if (index == 0) {
-          RouteDestination.GoToHome(context, role: 'admin');
+          RouteDestination.GoToHome(context);
         }
         else if (index == 1) {
-          RouteDestination.GoToInventory(context, role: 'admin');
+          RouteDestination.GoToBuku(context);
         }
         else if(index == 2) {
-          RouteDestination.GoToReport(context);
+          RouteDestination.GoToPeminjaman(context);
         }
         else {
           RouteDestination.GoToSetting(context);

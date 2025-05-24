@@ -1,83 +1,131 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'navbar_widget.dart';
-import 'mysqlutils.dart';
 import 'route_destination.dart';
-
+import 'package:google_fonts/google_fonts.dart';
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Map<String, dynamic>> products = [];
+  List<Map<String, dynamic>> books = [];
   bool isLoading = true;
   int lowStockCount = 0;
   int highStockCount = 0;
   final TextEditingController searchCtrl = TextEditingController();
-  List<Map<String, dynamic>> allProducts = [];
+  List<Map<String, dynamic>> allBooks = [];
+
+  final Color themeColor = const Color(0xFF4A4A6A);
+  final Color accentColor = const Color(0xFF8E97FD);
+  final Color bgColor = const Color(0xFFF0F4FA);
 
   @override
   void initState() {
     super.initState();
-    fetchProducts();
+    fetchBooks();
   }
 
-  Future<void> fetchProducts() async {
-    final conn = await MysqlUtils.getConnection();
-    final result = await conn.query('SELECT * FROM products');
-
-    List<Map<String, dynamic>> fetched = [];
-    
-    for (var row in result) {
-      int stock = row['stok'];
-      if (stock < 15) lowStockCount++;
-      if (stock > 15) highStockCount++;
-
-      fetched.add({
-        'id': row['idproduk'],
-        'name': row['namaproduk'],
-        'category': row['kategori'],
-        'stock': row['stok'],
-        'price': row['harga'],
-        'image': row['image'],
-      });
-    }
-
+  Future<void> fetchBooks() async {
     setState(() {
-      products = fetched;
-      allProducts = fetched;
-      isLoading = false;
+      isLoading = true;
     });
 
-    await conn.close();
+    try {
+      final response = await http.get(Uri.parse('http://192.168.58.179/phpPerpus/daftarbuku.php'));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          List<dynamic> rawBooks = data['books'];
+          int lowCount = 0;
+          int highCount = 0;
+
+          List<Map<String, dynamic>> fetchedBooks = rawBooks.map<Map<String, dynamic>>((item) {
+            int stok = int.tryParse(item['stock'].toString()) ?? 0;
+            if (stok < 15) {
+              lowCount++;
+            } else {
+              highCount++;
+            }
+            return {
+              'id': item['idbuku'],
+              'name': item['title'],
+              'category': item['author'], // Bisa sesuaikan kategori kalau ada
+              'stock': stok,
+              'image': item['image'] ?? '',
+            };
+          }).toList();
+
+          setState(() {
+            books = fetchedBooks;
+            allBooks = fetchedBooks;
+            lowStockCount = lowCount;
+            highStockCount = highCount;
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            books = [];
+            allBooks = [];
+            lowStockCount = 0;
+            highStockCount = 0;
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          books = [];
+          allBooks = [];
+          lowStockCount = 0;
+          highStockCount = 0;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        books = [];
+        allBooks = [];
+        lowStockCount = 0;
+        highStockCount = 0;
+        isLoading = false;
+      });
+    }
   }
 
   void applyFilter() {
     final query = searchCtrl.text.toLowerCase();
     setState(() {
       if (query.isNotEmpty) {
-        products = allProducts.where((p) {
-          return p['name'].toString().toLowerCase().contains(query);
+        books = allBooks.where((b) {
+          return b['name'].toString().toLowerCase().contains(query);
         }).toList();
       } else {
-        products = allProducts;
+        books = allBooks;
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final TextStyle headerStyle = GoogleFonts.poppins(
+      fontWeight: FontWeight.bold,
+      fontSize: 18,
+      color: themeColor,
+    );
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Header
               Row(
                 children: [
                   const CircleAvatar(
@@ -85,21 +133,21 @@ class _HomePageState extends State<HomePage> {
                     backgroundImage: NetworkImage('https://i.pravatar.cc/300'),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    'CekStok',
-                    style: TextStyle(
-                      color: Colors.blueAccent,
+                  Text(
+                    'Perpustakaan Digital',
+                    style: GoogleFonts.poppins(
+                      color: accentColor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 20,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.notifications_none_rounded),
+                    icon: Icon(Icons.notifications_none_rounded, color: themeColor),
                     onPressed: () {},
                   ),
                   IconButton(
-                    icon: const Icon(Icons.settings),
+                    icon: Icon(Icons.settings, color: themeColor),
                     onPressed: () {
                       RouteDestination.GoToSetting(context);
                     },
@@ -107,78 +155,88 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // --- Search Bar
               TextField(
                 controller: searchCtrl,
                 onChanged: (_) => applyFilter(),
                 decoration: InputDecoration(
-                  hintText: "Search...",
-                  prefixIcon: const Icon(Icons.search),
+                  hintText: "Cari buku...",
+                  prefixIcon: Icon(Icons.search, color: accentColor),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
                   ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: accentColor, width: 2),
+                  ),
                 ),
+                style: GoogleFonts.poppins(color: themeColor),
               ),
               const SizedBox(height: 20),
-
-              // --- Statistik Cards
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildStatCard(highStockCount.toString(), "High stock", Icons.trending_up),
-                  _buildStatCard(lowStockCount.toString(), "Low stock", Icons.trending_down),
-                  _buildStatCard(products.length.toString(), "Total Items", Icons.widgets),
+                  _buildStatCard(highStockCount.toString(), "Stok Tinggi", Icons.trending_up, accentColor),
+                  _buildStatCard(lowStockCount.toString(), "Stok Rendah", Icons.trending_down, Colors.redAccent),
+                  _buildStatCard(books.length.toString(), "Total Buku", Icons.book_outlined, themeColor),
                 ],
               ),
               const SizedBox(height: 20),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "Recent Documents",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    "Buku",
+                    style: headerStyle,
                   ),
                   GestureDetector(
                     onTap: () {
-                      RouteDestination.GoToInventory; // pakai role dari widget
+                      RouteDestination.GoToBuku(context);
                     },
-                    child: const Text(
-                      "View All",
-                      style: TextStyle(color: Colors.blue),
+                    child: Text(
+                      "Lihat Semua",
+                      style: GoogleFonts.poppins(
+                        color: accentColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        decoration: TextDecoration.underline,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-
-              // --- Daftar Produk dari Database
+              const SizedBox(height: 12),
               Expanded(
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : ListView.builder(
-                        itemCount: products.length,
-                        itemBuilder: (context, index) {
-                          final p = products[index];
-                          final int stock = p['stock'] ?? 0;
-                          final bool isUp = stock > 15;
+                    : books.isEmpty
+                        ? Center(
+                            child: Text(
+                              "Tidak ada buku ditemukan.",
+                              style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: books.length,
+                            itemBuilder: (context, index) {
+                              final buku = books[index];
+                              final int stock = buku['stock'] ?? 0;
+                              final bool isAvailable = stock > 15;
 
-                          return _buildRecentItem(
-                            p['name'].toString(),
-                            p['category'].toString(),
-                            "Stok: $stock",
-                            p['image'].toString().isNotEmpty
-                                ? p['image'].toString()
-                                : 'https://via.placeholder.com/50',
-                            isUp,
-                          );
-                        },
-                      ),
+                              return _buildBookItem(
+                                buku['name'].toString(),
+                                buku['category'].toString(),
+                                "Stok: $stock",
+                                buku['image'].toString().isNotEmpty
+                                    ? buku['image'].toString()
+                                    : 'https://via.placeholder.com/50',
+                                isAvailable,
+                              );
+                            },
+                          ),
               ),
             ],
           ),
@@ -188,61 +246,82 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildStatCard(String value, String label, IconData icon) {
+  Widget _buildStatCard(String value, String label, IconData icon, Color iconColor) {
     return Container(
-      width: 100,
-      padding: const EdgeInsets.all(12),
+      width: 110,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: iconColor.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, size: 28, color: Colors.blue),
-          const SizedBox(height: 8),
+          Icon(icon, size: 30, color: iconColor),
+          const SizedBox(height: 10),
           Text(
             value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.black87),
           ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          const SizedBox(height: 6),
+          Text(label, style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey[700])),
         ],
       ),
     );
   }
 
-  Widget _buildRecentItem(
+  Widget _buildBookItem(
     String title,
-    String user,
-    String time,
+    String author,
+    String stockText,
     String imgUrl,
-    bool isUp,
+    bool isAvailable,
   ) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             child: Image.network(
               imgUrl,
               width: 50,
               height: 50,
               fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 50,
+                height: 50,
+                color: Colors.grey[300],
+                child: const Icon(Icons.book, color: Colors.grey),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(user, style: const TextStyle(color: Colors.grey)),
+                Text(title, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text(author, style: GoogleFonts.poppins(color: Colors.grey[700], fontSize: 13)),
               ],
             ),
           ),
@@ -250,12 +329,12 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Icon(
-                isUp ? Icons.trending_up : Icons.trending_down,
-                color: isUp ? Colors.green : Colors.red,
-                size: 20,
+                isAvailable ? Icons.trending_up : Icons.trending_down,
+                color: isAvailable ? Colors.green : Colors.red,
+                size: 22,
               ),
               const SizedBox(height: 4),
-              Text(time, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(stockText, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[600])),
             ],
           ),
         ],

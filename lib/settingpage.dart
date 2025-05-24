@@ -4,9 +4,9 @@ class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   void logout(BuildContext context) {
-    // Hapus session user kalau pakai penyimpanan lokal (misal SharedPreferences)
+    // buat biar engga ngesave data login kalo logout
 
-    // Kembali ke halaman login
+    // buat ke logout
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
 

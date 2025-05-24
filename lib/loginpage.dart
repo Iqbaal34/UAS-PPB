@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:perpustakaan/mysqlutils.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Loginpage extends StatefulWidget {
   const Loginpage({super.key});
@@ -20,31 +22,59 @@ class _LoginPageState extends State<Loginpage> {
       errorMessage = null;
     });
 
-    final conn = await MysqlUtils.getConnection();
-    final result = await conn.query(
-      'SELECT * FROM akun WHERE username = ? AND password = ?',
-      [usernameCtrl.text.trim(), passwordCtrl.text.trim()],
-    );
-    await conn.close();
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.58.179/phpPerpus/login.php'),
+        body: {
+          'username': usernameCtrl.text.trim(),
+          'password': passwordCtrl.text.trim(),
+        },
+      );
 
-    if (result.isNotEmpty) {
-      final user = result.first.fields;
-      if (user['status'] == 'aktif') {
-        Navigator.pushReplacementNamed(context, '/home');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        if (data['success'] == true) {
+          if (data['status'] == 'aktif') {
+            // Simpan nim user ke SharedPreferences
+            final prefs = await SharedPreferences.getInstance();
+            // Asumsikan data nim ada di respons API, misal: data['nim']
+            final nim = data['nim'] ?? usernameCtrl.text.trim();
+            await prefs.setString('nimUser', nim);
+
+            Navigator.pushReplacementNamed(context, '/home');
+          } else {
+            setState(() {
+              errorMessage =
+                  data['message'] ?? "Akun belum dikonfirmasi oleh admin.";
+            });
+          }
+        } else {
+          setState(() {
+            errorMessage = data['message'] ?? "Username atau password salah.";
+          });
+        }
       } else {
         setState(() {
-          errorMessage = "Akun belum dikonfirmasi oleh admin.";
+          errorMessage = "Server error: ${response.statusCode}";
         });
       }
-    } else {
+    } catch (e) {
       setState(() {
-        errorMessage = "Username atau password salah.";
+        errorMessage = "Terjadi kesalahan koneksi: $e";
       });
     }
 
     setState(() {
       isLoading = false;
     });
+  }
+
+  @override
+  void dispose() {
+    usernameCtrl.dispose();
+    passwordCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -57,10 +87,7 @@ class _LoginPageState extends State<Loginpage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/images/login-page-banner.webp',
-                height: 250,
-              ),
+              Image.asset('assets/images/Login.png', height: 250),
               const SizedBox(height: 100),
               const SizedBox(
                 width: double.infinity,
@@ -68,9 +95,10 @@ class _LoginPageState extends State<Loginpage> {
                   'Login Perpustakaan',
                   textAlign: TextAlign.start,
                   style: TextStyle(
-                      fontSize: 30,
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w600),
+                    fontSize: 30,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const SizedBox(
@@ -78,10 +106,11 @@ class _LoginPageState extends State<Loginpage> {
                 child: Text(
                   'Silakan login untuk melanjutkan',
                   style: TextStyle(
-                      fontSize: 17,
-                      color: Colors.grey,
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w400),
+                    fontSize: 17,
+                    color: Colors.grey,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w400,
+                  ),
                   textAlign: TextAlign.start,
                 ),
               ),
@@ -122,19 +151,20 @@ class _LoginPageState extends State<Loginpage> {
                           borderRadius: BorderRadius.circular(30),
                         ),
                       ),
-                      child: isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w500,
+                      child:
+                          isLoading
+                              ? const CircularProgressIndicator(
                                 color: Colors.white,
+                              )
+                              : const Text(
+                                'Login',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
                     ),
                   ),
                   if (errorMessage != null)
@@ -148,7 +178,7 @@ class _LoginPageState extends State<Loginpage> {
                   const SizedBox(height: 16),
                   GestureDetector(
                     onTap: () {
-                      Navigator.pushNamed(context, '/register'); // Ganti sesuai rute halaman register kamu
+                      Navigator.pushNamed(context, '/register');
                     },
                     child: const Text(
                       'Belum punya akun? Register here',

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:perpustakaan/daftaranggota.dart';
 import 'package:perpustakaan/homepage.dart';
 import 'package:perpustakaan/loginpage.dart';
 import 'package:perpustakaan/settingpage.dart';
+import 'package:perpustakaan/registerpage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,6 +19,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        textTheme: GoogleFonts.poppinsTextTheme(),
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.grey,
           brightness: Brightness.light,
@@ -26,6 +30,8 @@ class MyApp extends StatelessWidget {
       '/login': (_) => const Loginpage(),
       '/home': (_) => HomePage(),
       '/settings': (_) => const SettingsPage(),
+      '/register': (context) => const RegisterPage(),
+      '/daftarAnggota': (context) => const DaftarAnggotaPage(),
   },
     );
   }

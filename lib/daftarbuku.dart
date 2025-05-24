@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:perpustakaan/mysqlutils.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'navbar_widget.dart';
+import 'pinjambukupage.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class DaftarBuku extends StatefulWidget {
   const DaftarBuku({super.key});
@@ -14,6 +18,10 @@ class _DaftarBukuState extends State<DaftarBuku> {
   bool isLoading = true;
   final TextEditingController searchCtrl = TextEditingController();
 
+  final Color themeColor = const Color(0xFF4A4A6A);
+  final Color accentColor = const Color(0xFF8E97FD);
+  final Color bgColor = const Color(0xFFF0F4FA);
+
   @override
   void initState() {
     super.initState();
@@ -21,147 +29,213 @@ class _DaftarBukuState extends State<DaftarBuku> {
   }
 
   Future<void> fetchBooks() async {
-    final conn = await MysqlUtils.getConnection();
-    final result = await conn.query('SELECT * FROM databuku');
-    await conn.close();
-
-    List<Map<String, dynamic>> fetched = [];
-    for (var row in result) {
-      fetched.add({
-        'id': row['idbuku'],
-        'title': row['namabuku'],
-        'image': row['image'],
-        'author': row['pengarang'],
-        'publisher': row['penerbit'],
-        'year': row['tahunterbit'],
-        'stock': row['stok'],
+    setState(() {
+      isLoading = true;
+    });
+    try {
+      final response = await http.get(
+        Uri.parse('http://192.168.58.179/phpPerpus/daftarbuku.php'),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          setState(() {
+            books = List<Map<String, dynamic>>.from(data['books']);
+            applyFilter();
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            books = [];
+            filteredBooks = [];
+            isLoading = false;
+          });
+        }
+      } else {
+        setState(() {
+          books = [];
+          filteredBooks = [];
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        books = [];
+        filteredBooks = [];
+        isLoading = false;
       });
     }
-
-    setState(() {
-      books = fetched;
-      applyFilter();
-      isLoading = false;
-    });
   }
 
   void applyFilter() {
     List<Map<String, dynamic>> temp = [...books];
     if (searchCtrl.text.isNotEmpty) {
-      temp = temp.where((b) => b['title']
-          .toString()
-          .toLowerCase()
-          .contains(searchCtrl.text.toLowerCase())).toList();
+      temp = temp.where((b) =>
+        b['title'].toString().toLowerCase().contains(searchCtrl.text.toLowerCase())
+      ).toList();
     }
     setState(() {
       filteredBooks = temp;
     });
   }
 
-  void deleteBook(int id) async {
-    final conn = await MysqlUtils.getConnection();
-    await conn.query('DELETE FROM databuku WHERE idbuku = ?', [id]);
-    await conn.close();
-    fetchBooks();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final textStyleTitle = GoogleFonts.poppins(
+      fontWeight: FontWeight.w600,
+      fontSize: 18,
+      color: themeColor,
+    );
+
+    final textStyleSubtitle = GoogleFonts.poppins(
+      fontSize: 14,
+      color: Colors.black87,
+    );
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
+      backgroundColor: bgColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('Daftar Buku', style: TextStyle(color: Colors.black)),
+        backgroundColor: themeColor,
+        elevation: 3,
         centerTitle: true,
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Tambah buku (belum ada halaman AddBook)
-        },
-        backgroundColor: Colors.blueAccent,
-        child: const Icon(Icons.add),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          'Daftar Buku',
+          style: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: isLoading
             ? const Center(child: CircularProgressIndicator())
             : Column(
                 children: [
+                  // Search Field
                   TextField(
                     controller: searchCtrl,
                     onChanged: (_) => applyFilter(),
+                    style: GoogleFonts.poppins(color: Colors.black87),
                     decoration: InputDecoration(
                       hintText: "Cari judul buku...",
-                      prefixIcon: const Icon(Icons.search),
+                      hintStyle: GoogleFonts.poppins(color: Colors.grey[500]),
+                      prefixIcon: Icon(Icons.search, color: accentColor),
                       filled: true,
                       fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: accentColor, width: 2),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 24),
+
+                  // List buku
                   Expanded(
-                    child: ListView.builder(
-                      itemCount: filteredBooks.length,
-                      itemBuilder: (context, index) {
-                        final b = filteredBooks[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.network(
-                                  b['image'] ?? 'https://via.placeholder.com/50',
-                                  width: 50,
-                                  height: 70,
-                                  fit: BoxFit.cover,
-                                ),
+                    child: filteredBooks.isEmpty
+                        ? Center(
+                            child: Text(
+                              "Tidak ada buku yang ditemukan",
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                color: Colors.grey[600],
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(b['title'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    Text("Pengarang: ${b['author']}"),
-                                    Text("Penerbit: ${b['publisher']}"),
-                                    Text("Tahun: ${b['year']}"),
-                                    Text("Stok: ${b['stock']}"),
-                                  ],
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: filteredBooks.length,
+                            itemBuilder: (context, index) {
+                              final b = filteredBooks[index];
+                              final stockInt = int.tryParse(b['stock'].toString()) ?? 0;
+
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => PinjamBukuPage(buku: b),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 20),
+                                  padding: const EdgeInsets.all(18),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Image.network(
+                                          b['image'] ?? 'https://via.placeholder.com/80x110',
+                                          width: 80,
+                                          height: 110,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => Container(
+                                            width: 80,
+                                            height: 110,
+                                            color: Colors.grey[300],
+                                            child: const Icon(
+                                              Icons.book,
+                                              color: Colors.grey,
+                                              size: 40,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 20),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(b['title'] ?? '-', style: textStyleTitle),
+                                            const SizedBox(height: 8),
+                                            Text("Pengarang: ${b['author'] ?? '-'}", style: textStyleSubtitle),
+                                            Text("Penerbit: ${b['publisher'] ?? '-'}", style: textStyleSubtitle),
+                                            Text("Tahun: ${b['year'] ?? '-'}", style: textStyleSubtitle),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              "Stok: ${b['stock'] ?? '0'}",
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: stockInt == 0 ? Colors.red : Colors.black87,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Column(
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blueAccent),
-                                    onPressed: () {
-                                      // Tambahkan navigasi ke edit page jika ada
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.redAccent),
-                                    onPressed: () => deleteBook(b['id']),
-                                  ),
-                                ],
-                              )
-                            ],
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
       ),
+      bottomNavigationBar: const NavbarWidget(),
     );
   }
 }

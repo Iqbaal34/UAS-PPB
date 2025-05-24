@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:perpustakaan/homepage.dart';
 import 'package:perpustakaan/settingpage.dart';
@@ -7,7 +8,7 @@ import 'daftarbuku.dart';
 import 'peminjaman.dart';
 
 class RouteDestination {
-  static void GoToHome(BuildContext context, {required String role}) {
+  static void GoToHome(BuildContext context) {
     navIndexNotifier.value = 0;
     Navigator.pushReplacement(
         context,
@@ -15,7 +16,7 @@ class RouteDestination {
       );
   }
 
-  static void GoToInventory(BuildContext context, {required String role}) {
+  static void GoToBuku(BuildContext context) {
     navIndexNotifier.value = 1;
     Navigator.pushReplacement(
         context,
@@ -23,11 +24,11 @@ class RouteDestination {
       );
   }
 
-  static void GoToReport(BuildContext context) {
+  static void GoToPeminjaman(BuildContext context) {
     navIndexNotifier.value = 2;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const Peminjaman()),
+      MaterialPageRoute(builder: (context) => const PeminjamanPage()),
     );
   }
 
@@ -36,13 +37,6 @@ class RouteDestination {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const SettingsPage()),
-    );
-  }
-  static void GoToLoginPage(BuildContext context) {
-    navIndexNotifier.value = 0;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const Loginpage()),
     );
   }
 }
